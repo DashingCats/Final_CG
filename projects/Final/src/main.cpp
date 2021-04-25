@@ -42,6 +42,7 @@ int main() {
 	// Enable texturing
 	glEnable(GL_TEXTURE_2D);
 
+
 	// Push another scope so most memory should be freed *before* we exit the app
 	{
 		#pragma region Shader and ImGui
@@ -87,8 +88,8 @@ int main() {
 
 		int activeEffect = 0;
 		std::vector<PostEffect*> effects;
-
-		GreyscaleEffect* greyscaleEffect;
+		NoEffect* noEffect;
+		Final* finalEffect;
 
 		
 
@@ -101,54 +102,39 @@ int main() {
 					mode_2 = false;
 					mode_3 = false;
 					mode_4 = false;
-					mode_5 = false;
 				}
 				if (ImGui::Checkbox("Ambient Only", &mode_2))
 				{
 					mode_1 = false;
 					mode_3 = false;
 					mode_4 = false;
-					mode_5 = false;
 				}
 				if (ImGui::Checkbox("Specular Only", &mode_3))
 				{
 					mode_1 = false;
 					mode_2 = false;
 					mode_4 = false;
-					mode_5 = false;
 				}
 				if (ImGui::Checkbox("Specular + Ambient", &mode_4))
 				{
 					mode_1 = false;
 					mode_2 = false;
 					mode_3 = false;
-					mode_5 = false;
 				}
-				if (ImGui::Checkbox("Specular + Ambient + Depth Of View", &mode_5))
+				if (ImGui::Checkbox("No Texture", &mode_5))
 				{
-					mode_1 = false;
-					mode_2 = false;
-					mode_3 = false;
-					mode_4 = false;
-
-					//activeEffect == 2;
-					//ColorCorrectEffect* temp = (ColorCorrectEffect*)effects[activeEffect];
-					//float threshold = temp->Getthreshold();
-
-					//if (ImGui::SliderFloat("threshold", &threshold, 0.0f, 1.0f))
-					//{
-					//	temp->Setthreshold(threshold);
-					//}
-
+					
+					glBindTexture(GL_TEXTURE_2D, 0);
 				}
 
 			}
-
+			int camerapos = 3;
 			shader->SetUniform("u_mode1", (int)mode_1);
 			shader->SetUniform("u_mode2", (int)mode_2);
 			shader->SetUniform("u_mode3", (int)mode_3);
 			shader->SetUniform("u_mode4", (int)mode_4);
 			shader->SetUniform("u_mode5", (int)mode_5);
+			shader->SetUniform("viewpos", camerapos);
 			if (ImGui::CollapsingHeader("Effect controls"))
 			{
 				ImGui::SliderInt("Chosen Effect", &activeEffect, 0, effects.size() - 1);
@@ -158,7 +144,34 @@ int main() {
 					ImGui::Text("Active Effect: No Effect");
 
 				}
+				if (activeEffect == 1)
+				{
+					ImGui::Text("Active Effect: Depth Of Field Effect");
 
+					
+
+					Final* temp = (Final*)effects[activeEffect];
+					
+					//float focalLength = temp->GetFocalLength();
+					//float aparture = temp->GetAparture();
+					//float planeInFocus = temp->GetPlaneInFocus();
+
+					/*ImGui::SliderFloat("Focal Length", &focalLength, 0, 100);
+					{
+						temp->SetFocalLength(focalLength);
+					}
+					ImGui::SliderFloat("Aparture", &aparture, 0, 100);
+					{
+						temp->SetAparture(aparture);
+					}
+					ImGui::SliderFloat("Plane In Focus", &planeInFocus, 0, 100);
+					{
+						temp->SetPlaneInFocus(planeInFocus);
+					}*/
+
+					
+				}
+			
 			}
 			if (ImGui::CollapsingHeader("Environment generation"))
 			{
@@ -226,6 +239,7 @@ int main() {
 
 		#pragma region TEXTURE LOADING
 
+		
 		// Load some textures from files
 		Texture2D::sptr stone = Texture2D::LoadFromFile("images/Stone_001_Diffuse.png");
 		Texture2D::sptr stoneSpec = Texture2D::LoadFromFile("images/Stone_001_Specular.png");
@@ -234,7 +248,8 @@ int main() {
 		Texture2D::sptr box = Texture2D::LoadFromFile("images/box.bmp");
 		Texture2D::sptr boxSpec = Texture2D::LoadFromFile("images/box-reflections.bmp");
 		Texture2D::sptr simpleFlora = Texture2D::LoadFromFile("images/SimpleFlora.png");
-		LUT3D testCube("cubes/BrightenedCorrection.cube");
+		Texture2D::sptr book = Texture2D::LoadFromFile("images/Book of Sun_Book_color.png");
+		//LUT3D testCube("cubes/BrightenedCorrection.cube");
 
 		// Load the cube map
 		//TextureCubeMap::sptr environmentMap = TextureCubeMap::LoadFromImages("images/cubemaps/skybox/sample.jpg");
@@ -296,6 +311,13 @@ int main() {
 		simpleFloraMat->Set("u_Shininess", 8.0f);
 		simpleFloraMat->Set("u_TextureMix", 0.0f);
 
+		ShaderMaterial::sptr bookmat = ShaderMaterial::Create();
+		bookmat->Shader = shader;
+		bookmat->Set("s_Diffuse", book);
+		bookmat->Set("s_Specular", noSpec);
+		bookmat->Set("u_Shininess", 8.0f);
+		bookmat->Set("u_TextureMix", 0.0f);
+
 		GameObject obj1 = scene->CreateEntity("Ground"); 
 		{
 			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/plane.obj");
@@ -310,7 +332,12 @@ int main() {
 			obj2.get<Transform>().SetLocalRotation(0.0f, 0.0f, -90.0f);
 			BehaviourBinding::BindDisabled<SimpleMoveBehaviour>(obj2);
 		}
-
+		GameObject obj3 = scene->CreateEntity("Book");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Book of Sun.obj");
+			obj3.get<Transform>().SetLocalPosition(0.0f, 0.0f, 5.0f);
+			obj3.emplace<RendererComponent>().SetMesh(vao).SetMaterial(bookmat);
+		}
 		std::vector<glm::vec2> allAvoidAreasFrom = { glm::vec2(-4.0f, -4.0f) };
 		std::vector<glm::vec2> allAvoidAreasTo = { glm::vec2(4.0f, 4.0f) };
 
@@ -352,14 +379,22 @@ int main() {
 			basicEffect = &framebufferObject.emplace<PostEffect>();
 			basicEffect->Init(width, height);
 		}
-
-		GameObject greyscaleEffectObject = scene->CreateEntity("Greyscale Effect");
-		{
-			greyscaleEffect = &greyscaleEffectObject.emplace<GreyscaleEffect>();
-			greyscaleEffect->Init(width, height);
-		}
-		effects.push_back(greyscaleEffect);
 		
+		GameObject noEffectObject = scene->CreateEntity("No Effect");
+		{
+			noEffect = &noEffectObject.emplace<NoEffect>();
+			noEffect->Init(width, height);
+		}
+		effects.push_back(noEffect);
+
+		GameObject finalEffectObject = scene->CreateEntity("Depth Of Field Effect");
+		{
+			finalEffect = &finalEffectObject.emplace<Final>();
+			finalEffect->Init(width, height);
+		}
+		effects.push_back(finalEffect);
+		
+
 		#pragma endregion 
 		//////////////////////////////////////////////////////////////////////////////////////////
 
@@ -420,10 +455,12 @@ int main() {
 				behaviour->Relative = !behaviour->Relative;
 				});
 		}
-
+		
 		// Initialize our timing instance and grab a reference for our use
 		Timing& time = Timing::Instance();
 		time.LastFrame = glfwGetTime();
+		
+		
 
 		///// Game loop /////
 		while (!glfwWindowShouldClose(BackendHandler::window)) {
@@ -463,8 +500,8 @@ int main() {
 
 			// Clear the screen
 			basicEffect->Clear();
-			/*greyscaleEffect->Clear();
-			sepiaEffect->Clear();*/
+			//greyscaleEffect->Clear();
+			//sepiaEffect->Clear();
 			for (int i = 0; i < effects.size(); i++)
 			{
 				effects[i]->Clear();
@@ -486,6 +523,8 @@ int main() {
 			glm::mat4 view = glm::inverse(camTransform.LocalTransform());
 			glm::mat4 projection = cameraObject.get<Camera>().GetProjection();
 			glm::mat4 viewProjection = projection * view;
+
+			float camerapos = cameraObject.get<Camera>().GetPosition().z;
 						
 			// Sort the renderers by shader and material, we will go for a minimizing context switches approach here,
 			// but you could for instance sort front to back to optimize for fill rate if you have intensive fragment shaders
@@ -519,7 +558,7 @@ int main() {
 					current->Bind();
 					BackendHandler::SetupShaderForFrame(current, view, projection);
 				}
-				// If the material has changed, apply it
+				//// If the material has changed, apply it
 				if (currentMat != renderer.Material) {
 					currentMat = renderer.Material;
 					currentMat->Apply();
